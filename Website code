@@ -1,0 +1,406 @@
+app.py
+
+from flask import Flask, render_template, request, jsonify
+from parser import process_input
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    user_input = request.json["message"].lower()
+
+    if user_input == "exit":
+        return jsonify({"response": "Thank you for using SCM Chatbot"})
+
+    response = process_input(user_input)
+    return jsonify({"response": response})
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+
+parser.py
+
+from responses import *
+
+def process_input(text):
+
+    if "help" in text:
+        return help_menu()
+
+    elif "order" in text and "status" in text:
+        return order_status()
+
+    elif "shipment" in text or "track" in text:
+        return shipment_status()
+
+    elif "inventory" in text or "stock" in text:
+        return inventory_status()
+
+    elif "warehouse" in text:
+        return warehouse_info()
+
+    elif "supplier" in text:
+        return supplier_info()
+
+    elif "delivery" in text:
+        return delivery_schedule()
+
+    elif "customer" in text:
+        return customer_info()
+
+    elif "product" in text:
+        return product_info()
+
+    elif "transport" in text or "vehicle" in text:
+        return transport_info()
+
+    else:
+        return "Sorry, I didn't understand. Type 'help'."
+
+
+
+responses.py
+
+import json
+
+def load_data(file):
+    with open(file) as f:
+        return json.load(f)
+
+orders = load_data("orders.json")
+shipments = load_data("shipments.json")
+inventory = load_data("inventory.json")
+suppliers = load_data("suppliers.json")
+warehouses = load_data("warehouses.json")
+deliveries = load_data("deliveries.json")
+customers = load_data("customers.json")
+products = load_data("products.json")
+transports = load_data("transport.json")
+
+
+def help_menu():
+
+    return """
+AVAILABLE COMMANDS
+
+order status
+shipment status
+inventory status
+warehouse info
+supplier details
+delivery schedule
+list customers
+product details
+transport vehicles
+help
+exit
+"""
+
+
+def order_status():
+
+    text = "Orders:\n"
+
+    for order in orders:
+        text += f"Order ID: {order['id']} Status: {order['status']}\n"
+
+    return text
+
+
+def shipment_status():
+
+    text = "Shipments:\n"
+
+    for ship in shipments:
+        text += f"Tracking: {ship['tracking']} Location: {ship['location']}\n"
+
+    return text
+
+
+def inventory_status():
+
+    text = "Inventory:\n"
+
+    for item in inventory:
+        text += f"{item['product']} - {item['quantity']} units\n"
+
+    return text
+
+
+def supplier_info():
+
+    text = "Suppliers:\n"
+
+    for s in suppliers:
+        text += f"{s['name']} - {s['product']}\n"
+
+    return text
+
+
+def delivery_schedule():
+
+    return """
+Delivery Schedule
+
+Monday - Kerala
+Tuesday - Tamil Nadu
+Wednesday - Karnataka
+Thursday - Andhra
+Friday - Telangana
+"""
+
+
+def warehouse_info():
+
+    text = "Warehouses:\n"
+
+    for w in warehouses:
+        text += f"{w['warehouse_id']} - {w['location']} Capacity: {w['capacity']}\n"
+
+    return text
+
+
+def customer_info():
+
+    text = "Customers:\n"
+
+    for c in customers:
+        text += f"{c['customer_id']} - {c['name']} ({c['city']})\n"
+
+    return text
+
+def product_info():
+
+    text = "Products:\n"
+
+    for p in products:
+        text += f"{p['product_id']} - {p['name']} Price: {p['price']}\n"
+
+    return text
+
+
+def transport_info():
+
+    text = "Transport Vehicles:\n"
+
+    for t in transports:
+        text += f"{t['vehicle_id']} - {t['type']} Capacity: {t['capacity']} Driver: {t['driver']}\n"
+
+    return text
+
+
+index.html
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SCM Chatbot</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="main-container">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <h2>SUPPLY CHAIN MANAGEMENT CHATBOT</h2>
+        <p>Type or Click 'help' for commands<br>Type or Click'exit' to quit</p>
+
+        <h3>AVAILABLE COMMANDS</h3>
+
+        <!-- HELP BUTTON (VISIBLE FIRST) -->
+        <button onclick="showCommands()">Help</button>
+
+        <!-- OTHER COMMANDS (HIDDEN INITIALLY) -->
+        <div id="commands">
+            <button onclick="quickSend('order status')">Order Status</button>
+            <button onclick="quickSend('shipment status')">Shipment Status</button>
+            <button onclick="quickSend('inventory status')">Inventory Status</button>
+            <button onclick="quickSend('warehouse info')">Warehouse Info</button>
+            <button onclick="quickSend('supplier details')">Supplier Details</button>
+            <button onclick="quickSend('delivery schedule')">Delivery Schedule</button>
+            <button onclick="quickSend('list customers')">List Customers</button>
+            <button onclick="quickSend('product details')">Product Details</button>
+            <button onclick="quickSend('transport vehicles')">Transport Vehicles</button>
+            <button class="exit-btn" onclick="quickSend('exit')">Exit</button>
+        </div>
+    </div>
+
+    <!-- CHAT AREA -->
+    <div class="chat-container">
+        <h2>🤖 Supply Chain Chatbot</h2>
+
+        <div id="chat-box"></div>
+
+        <div class="input-box">
+            <input type="text" id="user-input" placeholder="Type your message...">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+
+// Format text with line breaks like CLI
+function formatResponse(text) {
+    return text.replace(/\n/g, "<br>");
+}
+
+// Show commands when Help is clicked
+function showCommands() {
+    quickSend('help');
+    document.getElementById("commands").style.display = "block";
+}
+
+// Send message from input box
+async function sendMessage() {
+    let input = document.getElementById("user-input");
+    let message = input.value;
+
+    if (message.trim() === "") return;
+
+    sendToBackend(message);
+    input.value = "";
+}
+
+// Send message from button click
+function quickSend(text) {
+    sendToBackend(text);
+}
+
+// Main function
+async function sendToBackend(message) {
+
+    let chatBox = document.getElementById("chat-box");
+
+    chatBox.innerHTML += `<div class="user">You: ${message}</div>`;
+
+    let response = await fetch("/chat", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({message: message})
+    });
+
+    let data = await response.json();
+
+    chatBox.innerHTML += `<div class="bot">Bot:<br>${formatResponse(data.response)}</div>`;
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    // IF EXIT → RESET TO ONLY HELP
+    if (message.toLowerCase() === "exit") {
+        document.getElementById("commands").style.display = "none";
+    }
+}
+
+</script>
+
+</body>
+</html>
+
+
+
+style.css
+
+body {
+    margin: 0;
+    font-family: Arial;
+    background: url("https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d") no-repeat center center/cover;
+}
+
+.main-container {
+    display: flex;
+    height: 100vh;
+}
+
+/* SIDEBAR */
+.sidebar {
+    width: 300px;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.sidebar h2 {
+    text-align: center;
+    font-size: 18px;
+}
+
+.sidebar p {
+    text-align: center;
+    font-size: 14px;
+}
+
+.sidebar button {
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0;
+    border: none;
+    border-radius: 5px;
+    background: #2d6cdf;
+    color: white;
+    cursor: pointer;
+}
+
+.sidebar button:hover {
+    background: #1a4db3;
+}
+
+.exit-btn {
+    background: red !important;
+}
+
+/* hidden commands initially */
+#commands {
+    display: none;
+    margin-top: 10px;
+}
+
+/* CHAT AREA */
+.chat-container {
+    flex: 1;
+    padding: 20px;
+    background: rgba(255,255,255,0.9);
+}
+
+#chat-box {
+    height: 75%;
+    overflow-y: scroll;
+    border: 1px solid #ccc;
+    padding: 10px;
+    background: white;
+}
+
+.user {
+    color: blue;
+    margin: 5px 0;
+}
+
+.bot {
+    color: green;
+    margin: 5px 0;
+}
+
+.input-box {
+    display: flex;
+    margin-top: 10px;
+}
+
+input {
+    flex: 1;
+    padding: 10px;
+}
+
+button {
+    padding: 10px;
+}
+
+
